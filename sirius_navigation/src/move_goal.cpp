@@ -5,6 +5,7 @@
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 #include "rclcpp/time.hpp"
 #include "yaml-cpp/yaml.h"
+#include "std_msgs/msg/string.hpp"
 using namespace std::chrono_literals;
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -19,7 +20,7 @@ public:
   explicit Nav2Client(size_t initial_count = 0): Node("nav2_send_goal"), count_(initial_count),renew_(0)
   {
     //アクション Client の作成
-
+    publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
     this->client_ptr_  = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
     file_path_ = "/home/kuri-tadaoki/turtlebot3_ws/src/sirius_navigation/src/example_point2.yaml";
     node_ = YAML::LoadFile(file_path_);
@@ -81,6 +82,9 @@ public:
 	}
         if (feedback->distance_remaining < 0.5&& renew_==1){
 	    count_++;
+            auto message = std_msgs::msg::String();
+	    message.data = std::to_string(count_);
+	    publisher_->publish(message);
 	    renew_=0;
 	    //std::this_thread::sleep_for(std::chrono::seconds(20));
 	    //auto goal_msg = NavigateToPose::Goal();
@@ -113,6 +117,7 @@ public:
   }
   size_t count_;
   int renew_;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
   std::string file_path_;
   std::vector<std::vector<double>> goal_points_;
   YAML::Node node_;
