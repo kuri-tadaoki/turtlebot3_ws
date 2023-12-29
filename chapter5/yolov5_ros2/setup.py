@@ -29,6 +29,7 @@ setup(
             'object_detection = yolov5_ros2.object_detection:main',
             'object_detection_tf = yolov5_ros2.object_detection_tf:main',
             'object_detection_srv = yolov5_ros2.object_detection_srv:main',
+            'nav_object = yolov5_ros2.nav_object:main',
         ],
     },
 )
