@@ -12,12 +12,15 @@ from tf2_ros import TransformBroadcaster
 from yolov5_ros2.detector import Detector, parse_opt
 from nav2_msgs.action import NavigateToPose
 from message_filters import ApproximateTimeSynchronizer, Subscriber
+from std_msgs.msg import String
 
 class ObjectDetection(Node):
 
     def __init__(self, **args):
         super().__init__('object_detection')
-
+        self.subscription = self.create_subscription(
+            String,'topic', self.count_callback, 10)
+        self.subscription
         self.target_name = 'bottle'
         self.frame_id = 'target'
 
@@ -35,6 +38,10 @@ class ObjectDetection(Node):
         self.ts.registerCallback(self.images_callback)
 
         self.broadcaster = TransformBroadcaster(self)
+
+    def count_callback(self, msg):
+        count_value = int(msg.data)
+        self.get_logger().info(f"受信したカウント: {count_value}")
 
     def send_goal(self, goal_msg):
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
