@@ -1,4 +1,5 @@
 import sys
+import time
 import subprocess
 import cv2
 import numpy as np
@@ -116,9 +117,10 @@ class ObjectDetection(Node):
                 self.broadcaster.sendTransform(ts)
 
                 if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
+                    time.sleep(3)
                     self.target_visible = True
         elif self.target_visible == True:
-            subprocess.run(["bash", "move_goal.bash"])
+            subprocess.Popen(["bash", "move_goal.bash"])
             self.target_visible = False
                     
 
