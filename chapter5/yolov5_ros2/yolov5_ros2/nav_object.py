@@ -19,6 +19,7 @@ class ObjectDetection(Node):
 
     def __init__(self, **args):
         super().__init__('object_detection')
+        self.target_visible = False
         self.subscription = self.create_subscription(
             String,'waypoint_count', self.count_callback, 10)
         self.subscription
@@ -40,6 +41,7 @@ class ObjectDetection(Node):
 
         self.broadcaster = TransformBroadcaster(self)
         self.count_value = 0 
+ 
     def count_callback(self, msg):
         count_value = int(msg.data)
         self.get_logger().info(f"受信したカウント: {count_value}")
@@ -77,11 +79,14 @@ class ObjectDetection(Node):
 
         cv2.imshow('color', img_color)
 
+        
         target = None
-        for r in result:
-            if r.name == self.target_name:
-                target = r
-                break
+        
+        if self.target_visible == False:
+            for r in result:
+                if r.name == self.target_name:
+                    target = r
+                    break
 
         if target is not None:
             u1 = round(target.u1)
@@ -111,8 +116,12 @@ class ObjectDetection(Node):
                 self.broadcaster.sendTransform(ts)
 
                 if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
-                    subprocess.Popen(["bash", "move_goal.bash"])
-                    #subprocess.Popen(["bash","nav_object.bash"])
+                    self.target_visible = True
+        elif self.target_visible == True:
+            subprocess.run(["bash", "move_goal.bash"])
+            self.target_visible = False
+                    
+
 
         img_depth *= 16
         if target is not None:
