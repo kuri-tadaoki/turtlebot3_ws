@@ -1,4 +1,5 @@
 import sys
+import subprocess
 import cv2
 import numpy as np
 import rclpy
@@ -19,7 +20,7 @@ class ObjectDetection(Node):
     def __init__(self, **args):
         super().__init__('object_detection')
         self.subscription = self.create_subscription(
-            String,'topic', self.count_callback, 10)
+            String,'waypoint_count', self.count_callback, 10)
         self.subscription
         self.target_name = 'bottle'
         self.frame_id = 'target'
@@ -38,10 +39,11 @@ class ObjectDetection(Node):
         self.ts.registerCallback(self.images_callback)
 
         self.broadcaster = TransformBroadcaster(self)
-
+        self.count_value = 0 
     def count_callback(self, msg):
         count_value = int(msg.data)
         self.get_logger().info(f"受信したカウント: {count_value}")
+        self.count_value = count_value
 
     def send_goal(self, goal_msg):
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
@@ -107,6 +109,10 @@ class ObjectDetection(Node):
                 ts.transform.translation.y = y
                 ts.transform.translation.z = z
                 self.broadcaster.sendTransform(ts)
+
+                if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
+                    subprocess.Popen(["bash", "move_goal.bash"])
+                    #subprocess.Popen(["bash","nav_object.bash"])
 
         img_depth *= 16
         if target is not None:
