@@ -20,12 +20,12 @@ public:
   explicit Nav2Client(size_t initial_count = 0): Node("nav2_send_goal"), count_(initial_count),renew_(0)
   {
     //アクション Client の作成
-    publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
+    publisher_ = this->create_publisher<std_msgs::msg::String>("waypoint_count", 10);
     this->client_ptr_  = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
     file_path_ = "/home/kuri-tadaoki/turtlebot3_ws/src/sirius_navigation/src/example_point2.yaml";
     node_ = YAML::LoadFile(file_path_);
     goal_points_ = node_["points"].as<std::vector<std::vector<double>>>();
-    sendGoal();
+    //sendGoal();
     setfeedback();
   }
 
@@ -68,7 +68,7 @@ public:
     //send_goal_options.result_callback = std::bind(&Nav2Client::resultCallback, this, _1);
     //Goal をサーバーに送信
     std::this_thread::sleep_for(std::chrono::seconds(3));
-    RCLCPP_INFO(get_logger(), "messege3");
+    //RCLCPP_INFO(get_logger(), "messege3");
     client_ptr_->async_send_goal(goal_msg, send_goal_options);
     RCLCPP_INFO(get_logger(), "sendgoal");
   }
