@@ -46,7 +46,9 @@ class ObjectDetection(Node):
     def count_callback(self, msg):
         count_value = int(msg.data)
         self.get_logger().info(f"受信したカウント: {count_value}")
-        self.count_value = count_value
+        self.count_value_list = [0] 
+        self.count_value_list.append(count_value)
+        self.count_value_list.pop(0)
 
     def send_goal(self, goal_msg):
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
@@ -120,7 +122,7 @@ class ObjectDetection(Node):
                     time.sleep(3)
                     self.target_visible = True
         elif self.target_visible == True:
-            subprocess.Popen(["bash", "move_goal.bash"])
+            subprocess.Popen(["bash", "move_goal.bash", str(self.count_value_list[-1])])
             self.target_visible = False
                     
 
