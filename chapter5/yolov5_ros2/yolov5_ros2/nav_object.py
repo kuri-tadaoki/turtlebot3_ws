@@ -15,21 +15,32 @@ from yolov5_ros2.detector import Detector, parse_opt
 from nav2_msgs.action import NavigateToPose
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 from std_msgs.msg import String
+from nav_msgs.msg import Odometry
 
 class ObjectDetection(Node):
 
     def __init__(self, **args):
         super().__init__('object_detection')
         self.target_visible = False
+        
         self.subscription = self.create_subscription(
             String,'waypoint_count', self.count_callback, 10)
-        self.subscription
+        
+       
+        self.odom_subscription = self.create_subscription(
+            Odometry, 'odom', self.odom_callback, 10)
+
+        #self.subscription
+        #self.odom_subscription
+        
+        
         self.target_name = 'bottle'
         self.frame_id = 'target'
 
         self.detector = Detector(**args)
         self.goal_msg = None 
         self.bridge = CvBridge()
+
         self.node = rclpy.create_node('nav2_send_goal')
         self.client = ActionClient(self.node, NavigateToPose, 'navigate_to_pose')
 
@@ -41,8 +52,23 @@ class ObjectDetection(Node):
         self.ts.registerCallback(self.images_callback)
 
         self.broadcaster = TransformBroadcaster(self)
+        
         self.count_value = 0 
  
+    def odom_callback(self, odom_msg):
+        #odom_msg = Odometry()
+        current_x = odom_msg.pose.pose.position.x 
+        current_y = odom_msg.pose.pose.position.y
+        current_z = odom_msg.pose.pose.position.z
+        current_qx = odom_msg.pose.pose.orientation.x
+        current_qy = odom_msg.pose.pose.orientation.y
+        current_qz = odom_msg.pose.pose.orientation.z
+        current_qw = odom_msg.pose.pose.orientation.w
+
+        self.get_logger().info(f"現在地x: {current_x}")
+        self.get_logger().info(f"現在地y: {current_y}")
+
+
     def count_callback(self, msg):
         count_value = int(msg.data)
         self.get_logger().info(f"受信したカウント: {count_value}")
@@ -118,9 +144,12 @@ class ObjectDetection(Node):
                 ts.transform.translation.z = z
                 self.broadcaster.sendTransform(ts)
 
+
+
                 if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
                     time.sleep(3)
                     self.target_visible = True
+        
         elif self.target_visible == True:
             subprocess.Popen(["bash", "move_goal.bash", str(self.count_value_list[-1])])
             self.target_visible = False
