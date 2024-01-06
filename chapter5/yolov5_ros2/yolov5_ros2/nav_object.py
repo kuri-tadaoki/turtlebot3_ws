@@ -55,6 +55,9 @@ class ObjectDetection(Node):
         
         self.count_value = 0 
  
+        self.odom_list = []
+        self.target_list = []
+
     def odom_callback(self, odom_msg):
         #odom_msg = Odometry()
         current_x = odom_msg.pose.pose.position.x 
@@ -65,8 +68,15 @@ class ObjectDetection(Node):
         current_qz = odom_msg.pose.pose.orientation.z
         current_qw = odom_msg.pose.pose.orientation.w
 
-        self.get_logger().info(f"現在地x: {current_x}")
-        self.get_logger().info(f"現在地y: {current_y}")
+        #self.get_logger().info(f"現在地x: {current_x}")
+        #self.get_logger().info(f"現在地y: {current_y}")
+        
+
+        self.odom_list.append([
+            current_x, current_y, current_z, current_qx, current_qy, current_qz, current_qw
+        ])
+        
+        #print(self.odom_list)
 
 
     def count_callback(self, msg):
@@ -79,13 +89,13 @@ class ObjectDetection(Node):
     def send_goal(self, goal_msg):
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
         goal_msg.pose.header.frame_id = 'map'
-        goal_msg.pose.pose.position.x = 2.0
-        goal_msg.pose.pose.position.y = 0.0
+        goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
+        goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][0])
         goal_msg.pose.pose.position.z = 0.2
-        goal_msg.pose.pose.orientation.x = 0.0
-        goal_msg.pose.pose.orientation.y = 0.0
-        goal_msg.pose.pose.orientation.z = 0.0
-        goal_msg.pose.pose.orientation.w = 1.0
+        goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+        goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+        goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+        goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
 
         send_goal_future = self.client.send_goal_async(goal_msg)
         rclpy.spin_until_future_complete(self.node, send_goal_future)
@@ -135,7 +145,9 @@ class ObjectDetection(Node):
                 y = z / fy * (v - cy)
                 self.get_logger().info(
                     f'{target.name} ({x:.3f}, {y:.3f}, {z:.3f})')
-                self.send_goal(self.goal_msg)
+                self.target_list.append([
+                    x, y, z
+                ])
                 ts = TransformStamped()
                 ts.header = msg_depth.header
                 ts.child_frame_id = self.frame_id
@@ -145,6 +157,8 @@ class ObjectDetection(Node):
                 self.broadcaster.sendTransform(ts)
 
 
+                if len(self.odom_list) > 0:
+                    self.send_goal(self.goal_msg)
 
                 if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
                     time.sleep(3)
