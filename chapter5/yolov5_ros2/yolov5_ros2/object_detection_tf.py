@@ -19,7 +19,7 @@ class ObjectDetection(Node):
     def __init__(self, **args):
         super().__init__('object_detection')
 
-        self.target_name = 'cup'
+        self.target_name = 'bottle'
         self.frame_id = 'target'
 
         self.detector = Detector(**args)

@@ -96,8 +96,8 @@ def launch_setup(context, *args, **kwargs):
             launch_ros.actions.Node(
                 package='realsense2_camera',
                 node_namespace=LaunchConfiguration("camera_name"),
-                node_name=LaunchConfiguration("camera_name"),
-                node_executable='realsense2_camera_node',
+                name=LaunchConfiguration("camera_name"),
+                executable='realsense2_camera_node',
                 prefix=['stdbuf -o L'],
                 parameters=[set_configurable_parameters(configurable_parameters)
                             , params_from_file
@@ -128,23 +128,24 @@ def launch_setup(context, *args, **kwargs):
 def generate_launch_description():
     static_tf_pub_laser = Node(
         package='tf2_ros',
-        node_executable='static_transform_publisher',
-        node_name='static_tf_pub_laser',
+        executable='static_transform_publisher',
+        name='static_tf_pub_laser',
         arguments=['0', '0', '0.1', '0', '0', '0','base_footprint', 'base_link'],
     )
 
     static_tf_pub_odom = Node(
         package='tf2_ros',
-        node_executable='static_transform_publisher',
-        node_name='static_tf_pub_odom',
-        arguments=['0', '0', '0.3', '0', '0', '0','base_link', 'camera_link'],
+        executable='static_transform_publisher',
+        name='static_tf_pub_odom',
+        arguments=['0', '0', '0.3', '0', '0', '0','base_footprint', 'camera_link'],
     )
     
  
     	
     return LaunchDescription(declare_configurable_parameters(configurable_parameters) + [
         OpaqueFunction(function=launch_setup),
-        static_tf_pub_laser,static_tf_pub_odom
+        #static_tf_pub_laser,
+        static_tf_pub_odom
 
 
     ])
