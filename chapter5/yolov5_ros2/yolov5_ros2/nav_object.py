@@ -55,8 +55,8 @@ class ObjectDetection(Node):
         
         self.count_value = 0 
  
-        self.odom_list = []
-        self.target_list = []
+        self.odom_list = [[0,0,0,0,0,0,0]]
+        self.target_list = [[0,0,0]]
 
     def odom_callback(self, odom_msg):
         #odom_msg = Odometry()
@@ -75,6 +75,7 @@ class ObjectDetection(Node):
         self.odom_list.append([
             current_x, current_y, current_z, current_qx, current_qy, current_qz, current_qw
         ])
+        self.odom_list.pop(0)
         
         #print(self.odom_list)
 
@@ -87,18 +88,36 @@ class ObjectDetection(Node):
         self.count_value_list.pop(0)
 
     def send_goal(self, goal_msg):
-        goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
-        goal_msg.pose.header.frame_id = 'map'
-        goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
-        goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][0])
-        goal_msg.pose.pose.position.z = 0.2
-        goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
-        goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
-        goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
-        goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
+        #原点x方向正向きのとき
+        if abs(self.odom_list[-1][5])<0.1:
+            goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
+            goal_msg.pose.header.frame_id = 'map'
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][0])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
 
-        send_goal_future = self.client.send_goal_async(goal_msg)
-        rclpy.spin_until_future_complete(self.node, send_goal_future)
+            send_goal_future = self.client.send_goal_async(goal_msg)
+            rclpy.spin_until_future_complete(self.node, send_goal_future)
+
+        #原点x方向負向きのとき
+        if abs(self.odom_list[-1][5])>0.8:
+            goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
+            goal_msg.pose.header.frame_id = 'map'
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][2])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
+            
+            send_goal_future = self.client.send_goal_async(goal_msg)
+            rclpy.spin_until_future_complete(self.node, send_goal_future)
+
 
     def images_callback(self, msg_info, msg_color, msg_depth):
         self.goal_msg = NavigateToPose.Goal()
@@ -148,6 +167,7 @@ class ObjectDetection(Node):
                 self.target_list.append([
                     x, y, z
                 ])
+                self.target_list.pop(0)
                 ts = TransformStamped()
                 ts.header = msg_depth.header
                 ts.child_frame_id = self.frame_id
