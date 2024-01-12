@@ -1,4 +1,5 @@
 import sys
+import playsound
 import time
 import subprocess
 import cv2
@@ -93,7 +94,7 @@ class ObjectDetection(Node):
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
         goal_msg.pose.header.frame_id = 'map'
         #原点x方向正向きのとき
-        if abs(self.odom_list[-1][5])<0.25:
+        if abs(self.odom_list[-1][5])<0.25 and abs(self.odom_list[-1][6])<0.85:
             goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
             goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
             goal_msg.pose.pose.position.z = 0.2
@@ -103,7 +104,7 @@ class ObjectDetection(Node):
             goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
 
         #原点x方向負向きのとき
-        if abs(self.odom_list[-1][5])>0.85:
+        if abs(self.odom_list[-1][6])<0.25 and abs(self.odom_list[-1][5])<0.85:
             goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][2])
             goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
             goal_msg.pose.pose.position.z = 0.2
@@ -204,6 +205,7 @@ class ObjectDetection(Node):
                     self.send_goal(self.goal_msg)
 
                 if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
+                    playsound.playsound("eva_fla.mp3")
                     time.sleep(3)
                     self.target_visible = True
         
