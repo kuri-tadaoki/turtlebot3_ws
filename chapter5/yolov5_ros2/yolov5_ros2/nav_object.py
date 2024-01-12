@@ -12,10 +12,11 @@ from cv_bridge import CvBridge, CvBridgeError
 from rclpy.utilities import remove_ros_args
 from tf2_ros import TransformBroadcaster
 from yolov5_ros2.detector import Detector, parse_opt
-from nav2_msgs.action import NavigateToPose, NavigateThroughPoses
+from nav2_msgs.action import NavigateToPose
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 from std_msgs.msg import String
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import PoseStamped
 
 class ObjectDetection(Node):
 
@@ -27,6 +28,10 @@ class ObjectDetection(Node):
             String,'waypoint_count', self.count_callback, 10)
         
        
+#        self.odom_subscription = self.create_subscription(
+#            Odometry, 'odom', self.odom_callback, 10)
+
+        self.current_msg = NavigateToPose.Feedback()
         #self.subscription
         #self.odom_subscription
         
@@ -55,23 +60,26 @@ class ObjectDetection(Node):
         self.odom_list = [[0,0,0,0,0,0,0]]
         self.target_list = [[0,0,0]]
 
-    def feedback_callback(self, goal_handle,feedback):
-        try:
-            # Feedback message structure
-            current_pose = feedback.current_pose
+    def feedback_callback(self, feedback_msg):
+        if feedback_msg is not None and feedback_msg.feedback is not None and feedback_msg.feedback.current_pose is not None:
+            current_pose = feedback_msg.feedback.current_pose
+            current_x = current_pose.pose.position.x
+            current_y = current_pose.pose.position.y
+            current_z = current_pose.pose.position.z
+            current_qx = current_pose.pose.orientation.x
+            current_qy = current_pose.pose.orientation.y
+            current_qz = current_pose.pose.orientation.z
+            current_qw = current_pose.pose.orientation.w
 
-            # Accessing individual components of PoseStamped
-            position = current_pose.pose.position
-            orientation = current_pose.pose.orientation
+            self.get_logger().info(f"現在地x: {current_x}")
+            self.get_logger().info(f"現在地y: {current_y}")
+            self.get_logger().info(f"角度qz: {current_qz}")
+            self.get_logger().info(f"角度qw: {current_qw}")
 
-            # Logging information
-            self.get_logger().info('Current Pose: %s', str(current_pose))
-
-            self.get_logger().info('Position: x=%.2f, y=%.2f, z=%.2f', position.x, position.y, position.z)
-            self.get_logger().info('Orientation: x=%.2f, y=%.2f, z=%.2f, w=%.2f',
-                                  orientation.x, orientation.y, orientation.z, orientation.w)
-        except AttributeError as e:
-            self.get_logger().error('Error accessing feedback attributes: %s', str(e))
+            self.odom_list.append([current_x, current_y, current_z, current_qx, current_qy, current_qz, current_qw])
+            self.odom_list.pop(0)
+        else:
+            self.get_logger().warn("feedback_msg is None or feedback_msg.feedback is None or feedback_msg.feedback.current_pose is None")
 
 
     def count_callback(self, msg):
@@ -82,17 +90,55 @@ class ObjectDetection(Node):
         self.count_value_list.pop(0)
 
     def send_goal(self, goal_msg):
-        goal_msg = NavigateToPose.Goal()
-        goal_msg.pose.header.stamp = self.get_clock().now().to_msg()
+        goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
         goal_msg.pose.header.frame_id = 'map'
-        goal_msg.pose.pose.position.x = 2.0
-        goal_msg.pose.pose.position.y = 0.0
-        goal_msg.pose.pose.orientation.x = 0.0
-        goal_msg.pose.pose.orientation.y = 0.0
-        goal_msg.pose.pose.orientation.z = 0.0
-        goal_msg.pose.pose.orientation.w = 1.0
+        #原点x方向正向きのとき
+        if abs(self.odom_list[-1][5])<0.25:
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
 
-        send_goal_future = self.client.send_goal_async(goal_msg, feedback_callback=self.feedback_callback)
+        #原点x方向負向きのとき
+        if abs(self.odom_list[-1][5])>0.85:
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][2])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
+            
+
+        #原点y軸方向正の向き
+        if(0.5 <= abs(self.odom_list[-1][5]) <= 0.85 and  
+            self.odom_list[-1][5] * self.odom_list[-1][6] > 0
+            ):
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][0])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][2])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
+            
+
+        #原点y軸方向負の向き
+        if(0.5 <= abs(self.odom_list[-1][5]) < 0.85 and 
+            self.odom_list[-1][5] * self.odom_list[-1][6] < 0
+            ):
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][0])
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][2])
+            goal_msg.pose.pose.position.z = 0.2
+            goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
+            goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
+            goal_msg.pose.pose.orientation.z = float(self.odom_list[-1][5])
+            goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
+            
+        send_goal_future = self.client.send_goal_async(goal_msg,  feedback_callback=self.feedback_callback)
         rclpy.spin_until_future_complete(self.node, send_goal_future)
 
 
@@ -190,3 +236,4 @@ if __name__ == '__main__':
     main()
 
 #kuri-tadaoki
+
