@@ -32,6 +32,9 @@ class ObjectDetection(Node):
 #        self.odom_subscription = self.create_subscription(
 #            Odometry, 'odom', self.odom_callback, 10)
 
+        self.current_pose_subscription = self.create_subscription(
+            PoseStamped, 'current_pose_info', self.odom_callback, 10)
+
         self.current_msg = NavigateToPose.Feedback()
         #self.subscription
         #self.odom_subscription
@@ -61,6 +64,18 @@ class ObjectDetection(Node):
         self.odom_list = [[0,0,0,0,0,0,0]]
         self.target_list = [[0,0,0]]
 
+    def odom_callback(self, geometry_msgs):
+        current_x = geometry_msgs.pose.position.x
+        current_y = geometry_msgs.pose.position.y
+        current_z = geometry_msgs.pose.position.z
+        current_qx = geometry_msgs.pose.orientation.x
+        current_qy = geometry_msgs.pose.orientation.y
+        current_qz = geometry_msgs.pose.orientation.z
+        current_qw = geometry_msgs.pose.orientation.w
+
+        self.odom_list.append([current_x, current_y, current_z, current_qx, current_qy, current_qz, current_qw])
+        self.odom_list.pop(0)
+
     def feedback_callback(self, feedback_msg):
         if feedback_msg is not None and feedback_msg.feedback is not None and feedback_msg.feedback.current_pose is not None:
             current_pose = feedback_msg.feedback.current_pose
@@ -74,8 +89,8 @@ class ObjectDetection(Node):
 
             self.get_logger().info(f"現在地x: {current_x}")
             self.get_logger().info(f"現在地y: {current_y}")
-            self.get_logger().info(f"角度qz: {current_qz}")
-            self.get_logger().info(f"角度qw: {current_qw}")
+            self.get_logger().info(f"姿勢qz: {current_qz}")
+            self.get_logger().info(f"姿勢qw: {current_qw}")
 
             self.odom_list.append([current_x, current_y, current_z, current_qx, current_qy, current_qz, current_qw])
             self.odom_list.pop(0)
@@ -88,15 +103,16 @@ class ObjectDetection(Node):
         self.get_logger().info(f"受信したカウント: {count_value}")
         self.count_value_list = [0] 
         self.count_value_list.append(count_value)
-        self.count_value_list.pop(0)
+        #self.count_value_list.pop(0)
 
     def send_goal(self, goal_msg):
+        front = 0.3
         goal_msg.pose.header.stamp = self.node.get_clock().now().to_msg()
         goal_msg.pose.header.frame_id = 'map'
         #原点x方向正向きのとき
-        if abs(self.odom_list[-1][5])<0.25 and abs(self.odom_list[-1][6])<0.85:
-            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2])
-            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
+        if abs(self.odom_list[-1][5])<0.25 and abs(self.odom_list[-1][6])>0.85:
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + self.target_list[-1][2] - front)
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - ((self.target_list[-1][0])*(self.target_list[-1][2]-front)/self.target_list[-1][2]))
             goal_msg.pose.pose.position.z = 0.2
             goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
             goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
@@ -104,9 +120,9 @@ class ObjectDetection(Node):
             goal_msg.pose.pose.orientation.w = float(self.odom_list[-1][6])
 
         #原点x方向負向きのとき
-        if abs(self.odom_list[-1][6])<0.25 and abs(self.odom_list[-1][5])<0.85:
-            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][2])
-            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][0])
+        if abs(self.odom_list[-1][6])<0.25 and abs(self.odom_list[-1][5])>0.85:
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][2] + front)
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + ((self.target_list[-1][0])*(self.target_list[-1][2]-front)/self.target_list[-1][2]))
             goal_msg.pose.pose.position.z = 0.2
             goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
             goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
@@ -118,8 +134,8 @@ class ObjectDetection(Node):
         if(0.5 <= abs(self.odom_list[-1][5]) <= 0.85 and  
             self.odom_list[-1][5] * self.odom_list[-1][6] > 0
             ):
-            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][0])
-            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][2])
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] + ((self.target_list[-1][0])*(self.target_list[-1][2]-front)/self.target_list[-1][2]))
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] + self.target_list[-1][2] -front)
             goal_msg.pose.pose.position.z = 0.2
             goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
             goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
@@ -131,8 +147,8 @@ class ObjectDetection(Node):
         if(0.5 <= abs(self.odom_list[-1][5]) < 0.85 and 
             self.odom_list[-1][5] * self.odom_list[-1][6] < 0
             ):
-            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - self.target_list[-1][0])
-            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][2])
+            goal_msg.pose.pose.position.x = float(self.odom_list[-1][0] - ((self.target_list[-1][0])*(self.target_list[-1][2]-front)/self.target_list[-1][2]))
+            goal_msg.pose.pose.position.y = float(self.odom_list[-1][1] - self.target_list[-1][2] + front)
             goal_msg.pose.pose.position.z = 0.2
             goal_msg.pose.pose.orientation.x = float(self.odom_list[-1][3])
             goal_msg.pose.pose.orientation.y = float(self.odom_list[-1][4])
@@ -204,13 +220,13 @@ class ObjectDetection(Node):
                 if len(self.odom_list) > 0:
                     self.send_goal(self.goal_msg)
 
-                if abs(ts.transform.translation.x) <= 0.03 and ts.transform.translation.z <=0.5:
+                if abs(ts.transform.translation.x) <= 0.3 and ts.transform.translation.z <=0.5:
                     playsound.playsound("eva_fla.mp3")
                     time.sleep(3)
                     self.target_visible = True
         
         elif self.target_visible == True:
-            subprocess.Popen(["bash", "move_goal.bash", str(self.count_value_list[-1])])
+            subprocess.Popen(["ros2", "run", "sirius_navigation", "move_goal", str(self.count_value_list[-1])])
             self.target_visible = False
                     
 
@@ -238,4 +254,3 @@ if __name__ == '__main__':
     main()
 
 #kuri-tadaoki
-
